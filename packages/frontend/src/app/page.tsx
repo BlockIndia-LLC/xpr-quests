@@ -7,9 +7,13 @@ import { useWallet } from "@/components/wallet/WalletProvider";
 import { useProfile } from "@/hooks/useProfile";
 import { useQuests } from "@/hooks/useQuests";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useSeasons } from "@/hooks/useSeasons";
+import { SeasonBanner } from "@/components/season/SeasonBanner";
+import { LevelUpAnimation } from "@/components/shared/LevelUpAnimation";
 import {
   SKILL_TREE_INFO,
   QuestStatus,
+  SeasonStatus,
   xpProgress,
   xpForNextLevel,
   xpForLevel,
@@ -152,9 +156,13 @@ function Dashboard({
     status: QuestStatus.ACTIVE,
     limit: 6,
   });
+  const { data: seasonsData } = useSeasons();
 
   const profile = profileData?.data;
   const quests = questsData?.data ?? [];
+  const activeSeason = seasonsData?.data?.find(
+    (s) => s.status === SeasonStatus.ACTIVE,
+  );
 
   const progressPct = useMemo(() => {
     if (!profile) return 0;
@@ -257,6 +265,9 @@ function Dashboard({
         )}
       </section>
 
+      {/* Season banner */}
+      {activeSeason && <SeasonBanner season={activeSeason} />}
+
       {/* Active quests section */}
       {profile && profile.quests_completed > 0 && (
         <section>
@@ -333,7 +344,7 @@ export default function HomePage() {
   const { isConnected, isLoading, account, login } = useWallet();
 
   // Connect WebSocket for live updates
-  useWebSocket(account);
+  const { levelUp, clearLevelUp } = useWebSocket(account);
 
   if (isLoading) {
     return (
@@ -350,5 +361,12 @@ export default function HomePage() {
     return <HeroSection onConnect={login} />;
   }
 
-  return <Dashboard account={account} />;
+  return (
+    <>
+      <Dashboard account={account} />
+      {levelUp && (
+        <LevelUpAnimation level={levelUp} onComplete={clearLevelUp} />
+      )}
+    </>
+  );
 }

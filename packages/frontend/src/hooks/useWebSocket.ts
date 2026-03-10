@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useSWRConfig } from "swr";
 import { WS_URL } from "@/lib/constants";
+import { useToastStore } from "@/stores/toastStore";
 import type { WsEvent } from "@xpr-quests/shared";
 
 const MAX_RECONNECT_ATTEMPTS = 5;
@@ -13,6 +14,7 @@ export function useWebSocket(account: string | null) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
 
   const connect = useCallback(() => {
     if (!account) return;
@@ -29,6 +31,9 @@ export function useWebSocket(account: string | null) {
     ws.onmessage = (event) => {
       try {
         const data: WsEvent = JSON.parse(event.data);
+        const addToast = useToastStore.getState().addToast;
+
+        // Revalidate related SWR caches
         if (data.data.quest_id) {
           mutate(`/api/quests/${data.data.quest_id}`);
         }
@@ -39,6 +44,70 @@ export function useWebSocket(account: string | null) {
           undefined,
           { revalidate: true },
         );
+        mutate(
+          (key: string) =>
+            typeof key === "string" && key.startsWith("/api/skill-trees"),
+          undefined,
+          { revalidate: true },
+        );
+        mutate(
+          (key: string) =>
+            typeof key === "string" && key.startsWith("/api/leaderboard"),
+          undefined,
+          { revalidate: true },
+        );
+
+        // Trigger toasts based on event type
+        switch (data.type) {
+          case "quest_complete":
+            addToast({
+              type: "success",
+              message: "Quest Completed!",
+              description: data.data.xp_awarded
+                ? `+${data.data.xp_awarded} XP earned`
+                : undefined,
+            });
+            break;
+
+          case "level_up":
+            addToast({
+              type: "success",
+              message: `Level Up! You are now level ${data.data.new_level}`,
+            });
+            if (data.data.new_level) {
+              setLevelUp(data.data.new_level);
+            }
+            break;
+
+          case "tier_up":
+            addToast({
+              type: "success",
+              message: "Tier Promotion!",
+              description: "You've reached a new tier rank",
+            });
+            break;
+
+          case "title_earned":
+            addToast({
+              type: "success",
+              message: "Soulbound Title Earned!",
+              description: data.data.title
+                ? `"${data.data.title}" has been added to your profile`
+                : undefined,
+            });
+            break;
+
+          case "quest_progress":
+            addToast({
+              type: "info",
+              message: "Quest Progress",
+              description:
+                data.data.current_count && data.data.required_count
+                  ? `${data.data.current_count}/${data.data.required_count} completed`
+                  : undefined,
+            });
+            break;
+        }
       } catch (err) {
         console.error("[WS] Parse error:", err);
       }
@@ -82,4 +151,6 @@ export function useWebSocket(account: string | null) {
       reconnectAttempts.current = 0;
     };
   }, [connect]);
+
+  return { levelUp, clearLevelUp: () => setLevelUp(null) };
 }

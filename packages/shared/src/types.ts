@@ -167,6 +167,64 @@ export interface LeaderboardEntry {
 }
 
 // ============================================================
+// Seasons
+// ============================================================
+
+export enum SeasonStatus {
+  UPCOMING = 0,
+  ACTIVE = 1,
+  ENDED = 2,
+}
+
+export interface Season {
+  season_id: number;
+  title: string;
+  description: string;
+  theme: string;
+  start_time: string;
+  end_time: string;
+  reward_pool: string;
+  nft_collection: string;
+  status: SeasonStatus;
+}
+
+// ============================================================
+// Skill tree progression
+// ============================================================
+
+export type SkillTreeQuestNodeStatus =
+  | "locked"
+  | "available"
+  | "in_progress"
+  | "completed";
+
+export interface SkillTreeQuestNode {
+  quest_id: number;
+  title: string;
+  description: string;
+  xp_reward: number;
+  difficulty: string;
+  branch_position: number;
+  prereq_quest_id: number;
+  status: SkillTreeQuestNodeStatus;
+}
+
+export interface SkillTreeWithProgress {
+  skill_tree: string;
+  title: string;
+  description: string;
+  icon_url: string;
+  branch_order: number[];
+  color: string;
+  user_xp: number;
+  user_tree_level: number;
+  user_quests_completed: number;
+  quests: SkillTreeQuestNode[];
+  completion_title: string;
+  title_earned: boolean;
+}
+
+// ============================================================
 // API response wrappers
 // ============================================================
 
@@ -193,7 +251,10 @@ export type WsEventType =
   | "quest_complete"
   | "reward_claimed"
   | "level_up"
-  | "tier_up";
+  | "tier_up"
+  | "title_earned"
+  | "season_start"
+  | "season_end";
 
 export interface WsEvent {
   type: WsEventType;
@@ -205,5 +266,6 @@ export interface WsEvent {
     xp_awarded?: number;
     new_level?: number;
     new_tier?: Tier;
+    title?: string;
   };
 }

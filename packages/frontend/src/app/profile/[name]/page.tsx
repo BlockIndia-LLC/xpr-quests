@@ -2,10 +2,12 @@
 
 import { useMemo } from "react";
 import { useParams } from "next/navigation";
-import { Shield, Award, Zap, TrendingUp, AlertTriangle } from "lucide-react";
+import { Shield, Award, Zap, TrendingUp, AlertTriangle, Crown, Lock } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import {
   SKILL_TREE_INFO,
+  SKILL_TREES,
+  SOULBOUND_TITLES,
   Tier,
   xpProgress,
   xpForNextLevel,
@@ -292,6 +294,62 @@ export default function ProfilePage() {
             No skill XP earned yet. Complete quests to build your skills!
           </p>
         )}
+      </section>
+
+      {/* ================================================================ */}
+      {/* Soulbound Titles                                                 */}
+      {/* ================================================================ */}
+      <section className="card space-y-5">
+        <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+          <Crown size={20} className="text-amber-400" />
+          Soulbound Titles
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {SKILL_TREES.map((tree) => {
+            const title = SOULBOUND_TITLES[tree];
+            const info = SKILL_TREE_INFO[tree];
+            const earned = profile.titles.includes(title);
+
+            return (
+              <div
+                key={tree}
+                className={clsx(
+                  "rounded-lg border p-4 flex items-center gap-3 transition-all",
+                  earned
+                    ? "border-amber-500/40 bg-amber-500/5 shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                    : "border-surface-border bg-background-elevated opacity-60",
+                )}
+              >
+                <div
+                  className={clsx(
+                    "w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0",
+                    earned ? "bg-amber-500/20" : "bg-surface",
+                  )}
+                >
+                  {earned ? (
+                    <Crown size={18} className="text-amber-400" />
+                  ) : (
+                    <Lock size={16} className="text-gray-500" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={clsx(
+                      "text-sm font-semibold truncate",
+                      earned ? "text-amber-300" : "text-gray-500",
+                    )}
+                  >
+                    {title}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {info.title} Branch
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {/* ================================================================ */}

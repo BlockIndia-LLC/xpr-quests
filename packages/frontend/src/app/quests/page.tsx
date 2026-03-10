@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { Zap, AlertTriangle } from "lucide-react";
 import { useQuests } from "@/hooks/useQuests";
+import { useSeasons } from "@/hooks/useSeasons";
+import { SeasonBanner } from "@/components/season/SeasonBanner";
 import {
   SKILL_TREE_INFO,
   SKILL_TREES,
   QuestStatus,
+  SeasonStatus,
   type Quest,
 } from "@xpr-quests/shared";
 import clsx from "clsx";
@@ -72,6 +75,11 @@ export default function QuestsPage() {
     status: QuestStatus.ACTIVE,
   });
 
+  const { data: seasonsData } = useSeasons();
+  const activeSeason = seasonsData?.data?.find(
+    (s) => s.status === SeasonStatus.ACTIVE,
+  );
+
   const quests: Quest[] = data?.data ?? [];
 
   return (
@@ -80,6 +88,13 @@ export default function QuestsPage() {
       <h1 className="text-3xl sm:text-4xl font-bold text-white mb-8">
         Quest Browser
       </h1>
+
+      {/* Active season banner */}
+      {activeSeason && (
+        <div className="mb-6">
+          <SeasonBanner season={activeSeason} compact />
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-wrap gap-2 mb-8">

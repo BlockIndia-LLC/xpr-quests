@@ -1,14 +1,21 @@
 import { config } from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { resolve } from "path";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../../../../.env") });
-
-import { db } from "./index.js";
-import { quests, skillTrees, seasons } from "./schema.js";
+// Load .env from monorepo root BEFORE any other imports
+config({ path: resolve(process.cwd(), "../../.env") });
+config({ path: resolve(process.cwd(), ".env") });
 
 async function seed() {
+  // Dynamic imports so DATABASE_URL from .env is loaded first
+  const { db } = await import("./index.js");
+  const { quests, skillTrees, seasons } = await import("./schema.js");
+  const { eq } = await import("drizzle-orm");
+  const {
+    NEW_BRANCH_QUESTS,
+    GENESIS_PREREQ_UPDATES,
+    BRANCH_ORDER,
+  } = await import("@xpr-quests/shared");
+
   console.log("Seeding database...");
 
   // ── Seed skill trees ─────────────────────────────────────────────────────
@@ -54,16 +61,16 @@ async function seed() {
     .values({
       title: "Genesis Season",
       description:
-        "The first season of XPR Quests - explore the ecosystem!",
+        "The first season of XPR Quests - explore the ecosystem and earn rewards!",
       theme: "general",
       start_time: new Date(),
-      end_time: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      end_time: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
       reward_pool: "10000.0000 XPR",
       status: 1,
     })
     .onConflictDoNothing();
 
-  // ── Seed 10 Genesis Quests (Section 9 of spec) ───────────────────────────
+  // ── Seed 10 Genesis Quests ───────────────────────────────────────────────
 
   const genesisQuests = [
     {
@@ -226,7 +233,7 @@ async function seed() {
         nft_template_id: -1,
         nft_collection: "",
         prereq_quest_id: 0,
-        season_id: 0,
+        season_id: 1,
         kyc_required: false,
         min_account_age_hrs: 48,
         max_completions: 0,
@@ -237,6 +244,64 @@ async function seed() {
   }
 
   console.log("Seeded 4 skill trees, 1 season, and 10 genesis quests.");
+
+  // ── Update genesis quests with prereq chains ─────────────────────────────
+
+  for (const [questId, prereqId] of Object.entries(GENESIS_PREREQ_UPDATES)) {
+    await db
+      .update(quests)
+      .set({ prereq_quest_id: prereqId })
+      .where(eq(quests.quest_id, parseInt(questId)));
+  }
+
+  console.log("Updated genesis quest prereq chains.");
+
+  // ── Seed new branch quests ───────────────────────────────────────────────
+
+  for (const quest of NEW_BRANCH_QUESTS) {
+    await db
+      .insert(quests)
+      .values({
+        quest_id: quest.quest_id,
+        creator: "xprquests",
+        title: quest.title,
+        description: quest.description,
+        quest_type: quest.quest_type,
+        target_contract: quest.target_contract,
+        target_action: quest.target_action,
+        target_params: quest.target_params,
+        required_count: quest.required_count,
+        xp_reward: quest.xp_reward,
+        skill_tree: quest.skill_tree,
+        difficulty: quest.difficulty,
+        prereq_quest_id: quest.prereq_quest_id,
+        tags: quest.tags,
+        nft_template_id: -1,
+        nft_collection: "",
+        season_id: 1,
+        kyc_required: false,
+        min_account_age_hrs: 48,
+        max_completions: 0,
+        completed_count: 0,
+        status: 1,
+        created_at: new Date(),
+      })
+      .onConflictDoNothing();
+  }
+
+  console.log(`Seeded ${NEW_BRANCH_QUESTS.length} new branch quests.`);
+
+  // ── Update skill tree branch_order ───────────────────────────────────────
+
+  for (const [tree, order] of Object.entries(BRANCH_ORDER)) {
+    await db
+      .update(skillTrees)
+      .set({ branch_order: order })
+      .where(eq(skillTrees.skill_tree, tree));
+  }
+
+  console.log("Updated skill tree branch_order arrays.");
+  console.log("Seed complete!");
   process.exit(0);
 }
 

@@ -10,6 +10,8 @@ import clsx from "clsx";
 const NAV_LINKS = [
   { href: "/", label: "Dashboard" },
   { href: "/quests", label: "Quests" },
+  { href: "/skill-trees", label: "Skill Trees" },
+  { href: "/leaderboard", label: "Leaderboard" },
 ];
 
 export function Navbar() {

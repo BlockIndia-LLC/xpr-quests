@@ -5,13 +5,19 @@ import {
   progress,
   users,
   skillXp,
+  seasonXp,
   questMetrics,
 } from "../db/schema.js";
 import { broadcastToUser } from "../ws/events.js";
+import { checkKYCStatus } from "../chain/tables.js";
 import {
   calculateLevel,
   calculateTier,
   calculateBoostedXP,
+  getTierName,
+  QuestType,
+  XP_MULTIPLIER,
+  SOULBOUND_TITLES,
 } from "@xpr-quests/shared";
 import type { WsEvent } from "@xpr-quests/shared";
 
@@ -62,6 +68,22 @@ async function processQuestForUser(
     (quest.completed_count ?? 0) >= quest.max_completions
   ) {
     return;
+  }
+
+  // Check prerequisite quest completion
+  if (quest.prereq_quest_id && quest.prereq_quest_id > 0) {
+    const prereqDone = await db
+      .select()
+      .from(progress)
+      .where(
+        and(
+          eq(progress.user_name, actor),
+          eq(progress.quest_id, quest.prereq_quest_id),
+          eq(progress.completed, true),
+        ),
+      )
+      .limit(1);
+    if (!prereqDone[0]) return;
   }
 
   // Check target_params filters if set
@@ -158,12 +180,16 @@ async function processQuestForUser(
       })
       .where(eq(questMetrics.quest_id, questId));
 
-    // Auto-award off-chain XP (user still needs to "claim" for on-chain)
+    // Auto-award off-chain XP
     await awardXPOffChain(
       actor,
       quest.xp_reward ?? 0,
       quest.skill_tree ?? "defi",
+      quest.season_id ?? 0,
     );
+
+    // Check if any composite quests are now completable
+    await checkCompositeQuests(actor, quest.skill_tree ?? "defi");
   }
 }
 
@@ -171,6 +197,7 @@ async function awardXPOffChain(
   account: string,
   xpReward: number,
   skillTree: string,
+  seasonId: number,
 ): Promise<void> {
   // Ensure user exists
   const existing = await db
@@ -180,51 +207,267 @@ async function awardXPOffChain(
     .limit(1);
 
   if (!existing[0]) {
+    // New user — check KYC for multiplier
+    let multiplier: number = XP_MULTIPLIER.DEFAULT;
+    let isKYCVerified = false;
+    try {
+      const isKYC = await checkKYCStatus(account);
+      if (isKYC) {
+        multiplier = XP_MULTIPLIER.KYC_VERIFIED;
+        isKYCVerified = true;
+      }
+    } catch {
+      // Chain call failed — use default multiplier
+    }
+
+    const boostedXP = calculateBoostedXP(xpReward, multiplier);
+    const newLevel = calculateLevel(boostedXP);
+    const newTier = calculateTier(boostedXP);
+
     await db.insert(users).values({
       name: account,
-      lifetime_xp: xpReward,
-      spendable_xp: xpReward,
-      level: calculateLevel(xpReward),
-      tier: calculateTier(xpReward),
-      kyc_verified: false,
-      xp_multiplier: 100,
+      lifetime_xp: boostedXP,
+      spendable_xp: boostedXP,
+      level: newLevel,
+      tier: newTier,
+      kyc_verified: isKYCVerified,
+      xp_multiplier: multiplier,
       titles: [],
       joined_at: new Date(),
       updated_at: new Date(),
     });
+
+    // Broadcast level_up for new users starting above level 0
+    if (newLevel > 0) {
+      broadcastToUser(account, {
+        type: "level_up",
+        data: { account, new_level: newLevel },
+      });
+    }
   } else {
-    const multiplier = existing[0].xp_multiplier ?? 100;
+    let multiplier: number = existing[0].xp_multiplier ?? XP_MULTIPLIER.DEFAULT;
+
+    // Check KYC if not yet verified
+    if (!existing[0].kyc_verified) {
+      try {
+        const isKYC = await checkKYCStatus(account);
+        if (isKYC) {
+          multiplier = XP_MULTIPLIER.KYC_VERIFIED;
+          await db
+            .update(users)
+            .set({
+              kyc_verified: true,
+              xp_multiplier: XP_MULTIPLIER.KYC_VERIFIED,
+            })
+            .where(eq(users.name, account));
+        }
+      } catch {
+        // Chain call failed — keep existing multiplier
+      }
+    }
+
     const boostedXP = calculateBoostedXP(xpReward, multiplier);
-    const newLifetime = (existing[0].lifetime_xp ?? 0) + boostedXP;
+    const oldLifetime = existing[0].lifetime_xp ?? 0;
+    const newLifetime = oldLifetime + boostedXP;
     const newSpendable = (existing[0].spendable_xp ?? 0) + boostedXP;
+
+    const oldLevel = calculateLevel(oldLifetime);
+    const oldTier = calculateTier(oldLifetime);
+    const newLevel = calculateLevel(newLifetime);
+    const newTier = calculateTier(newLifetime);
 
     await db
       .update(users)
       .set({
         lifetime_xp: newLifetime,
         spendable_xp: newSpendable,
-        level: calculateLevel(newLifetime),
-        tier: calculateTier(newLifetime),
+        level: newLevel,
+        tier: newTier,
         updated_at: new Date(),
       })
       .where(eq(users.name, account));
+
+    // Broadcast level/tier up events
+    if (newLevel > oldLevel) {
+      broadcastToUser(account, {
+        type: "level_up",
+        data: { account, new_level: newLevel },
+      });
+    }
+    if (newTier > oldTier) {
+      broadcastToUser(account, {
+        type: "tier_up",
+        data: { account, new_tier: newTier },
+      });
+    }
   }
 
-  // Update skill XP -- upsert on unique (user_name, skill_tree) index
+  // Update skill XP — upsert on unique (user_name, skill_tree) index
+  const boostedXP = calculateBoostedXP(
+    xpReward,
+    (existing?.[0]?.xp_multiplier ?? XP_MULTIPLIER.DEFAULT),
+  );
   await db
     .insert(skillXp)
     .values({
       user_name: account,
       skill_tree: skillTree,
-      xp: xpReward,
+      xp: boostedXP,
       tree_level: 0,
       quests_completed: 1,
     })
     .onConflictDoUpdate({
       target: [skillXp.user_name, skillXp.skill_tree],
       set: {
-        xp: sql`${skillXp.xp} + ${xpReward}`,
+        xp: sql`${skillXp.xp} + ${boostedXP}`,
         quests_completed: sql`${skillXp.quests_completed} + 1`,
       },
     });
+
+  // Update season XP if quest belongs to a season
+  if (seasonId > 0) {
+    await db
+      .insert(seasonXp)
+      .values({
+        user_name: account,
+        season_id: seasonId,
+        xp: boostedXP,
+        rank: 0,
+      })
+      .onConflictDoUpdate({
+        target: [seasonXp.user_name, seasonXp.season_id],
+        set: {
+          xp: sql`${seasonXp.xp} + ${boostedXP}`,
+        },
+      });
+  }
+}
+
+async function checkCompositeQuests(
+  actor: string,
+  skillTree: string,
+): Promise<void> {
+  // Find active composite quests in this skill tree
+  const composites = await db
+    .select()
+    .from(quests)
+    .where(
+      and(
+        eq(quests.skill_tree, skillTree),
+        eq(quests.quest_type, QuestType.COMPOSITE),
+        eq(quests.status, 1),
+      ),
+    );
+
+  for (const composite of composites) {
+    // Check if already completed
+    const existingProg = await db
+      .select()
+      .from(progress)
+      .where(
+        and(
+          eq(progress.user_name, actor),
+          eq(progress.quest_id, composite.quest_id),
+        ),
+      )
+      .limit(1);
+    if (existingProg[0]?.completed) continue;
+
+    // Get all non-composite branch quests in this skill tree
+    const branchQuests = await db
+      .select()
+      .from(quests)
+      .where(
+        and(
+          eq(quests.skill_tree, skillTree),
+          eq(quests.status, 1),
+        ),
+      );
+
+    // Check if all non-composite quests are completed
+    let allDone = true;
+    for (const bq of branchQuests) {
+      if (bq.quest_type === QuestType.COMPOSITE) continue;
+      const bqProg = await db
+        .select()
+        .from(progress)
+        .where(
+          and(
+            eq(progress.user_name, actor),
+            eq(progress.quest_id, bq.quest_id),
+            eq(progress.completed, true),
+          ),
+        )
+        .limit(1);
+      if (!bqProg[0]) {
+        allDone = false;
+        break;
+      }
+    }
+
+    if (allDone) {
+      // Auto-complete the composite quest
+      await db
+        .insert(progress)
+        .values({
+          user_name: actor,
+          quest_id: composite.quest_id,
+          current_count: 1,
+          completed: true,
+          completed_at: new Date(),
+          claimed: false,
+        })
+        .onConflictDoNothing();
+
+      // Broadcast completion
+      broadcastToUser(actor, {
+        type: "quest_complete",
+        data: {
+          account: actor,
+          quest_id: Number(composite.quest_id),
+          current_count: 1,
+          required_count: 1,
+        },
+      });
+
+      // Award composite XP
+      await awardXPOffChain(
+        actor,
+        composite.xp_reward ?? 0,
+        skillTree,
+        composite.season_id ?? 0,
+      );
+
+      // Award soulbound title for branch completion
+      await awardBranchTitle(actor, skillTree);
+    }
+  }
+}
+
+async function awardBranchTitle(
+  account: string,
+  skillTree: string,
+): Promise<void> {
+  const title = SOULBOUND_TITLES[skillTree as keyof typeof SOULBOUND_TITLES];
+  if (!title) return;
+
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.name, account))
+    .limit(1);
+  if (!user[0]) return;
+
+  const currentTitles = user[0].titles ?? [];
+  if (currentTitles.includes(title)) return;
+
+  await db
+    .update(users)
+    .set({ titles: [...currentTitles, title] })
+    .where(eq(users.name, account));
+
+  broadcastToUser(account, {
+    type: "title_earned",
+    data: { account, quest_id: 0 },
+  });
 }
