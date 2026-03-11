@@ -8,8 +8,11 @@ import {
   reports,
   proofSubmissions,
   seasons,
+  chainSyncQueue,
 } from "../db/schema.js";
 import { authMiddleware, adminGuard } from "../middleware/auth.js";
+import { createBadgeTemplate } from "../chain/actions.js";
+import { NFT_COLLECTION, BADGE_SCHEMA } from "@xpr-quests/shared";
 
 type Variables = { account: string };
 const adminRoutes = new Hono<{ Variables: Variables }>();
@@ -203,6 +206,92 @@ adminRoutes.post("/admin/seasons/:id/end", async (c) => {
   const seasonId = parseInt(c.req.param("id"));
   await db.update(seasons).set({ status: 2 }).where(eq(seasons.season_id, seasonId));
   return c.json({ success: true, data: { season_id: seasonId, status: "ended" } });
+});
+
+// ── Badge Template Creation ─────────────────────────────────────────────────
+
+adminRoutes.post("/admin/badges/template", async (c) => {
+  const body = await c.req.json();
+  const { quest_id, title, skill_tree, xp_reward, difficulty, image_url } = body;
+
+  if (!quest_id || !title || !image_url) {
+    return c.json({ success: false, error: "quest_id, title, and image_url are required" }, 400);
+  }
+
+  try {
+    const result = await createBadgeTemplate(
+      NFT_COLLECTION,
+      BADGE_SCHEMA,
+      quest_id,
+      title,
+      skill_tree || "defi",
+      xp_reward || 0,
+      difficulty || "beginner",
+      image_url,
+    );
+    const txId = result.resolved?.transaction?.id?.toString() ?? null;
+    return c.json({ success: true, data: { tx_id: txId } }, 201);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ success: false, error: msg }, 500);
+  }
+});
+
+// ── Chain Sync Queue Management ─────────────────────────────────────────────
+
+adminRoutes.get("/admin/chain-sync", async (c) => {
+  const pendingCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(chainSyncQueue)
+    .where(eq(chainSyncQueue.status, "pending"));
+
+  const failedCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(chainSyncQueue)
+    .where(eq(chainSyncQueue.status, "failed"));
+
+  const completedCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(chainSyncQueue)
+    .where(eq(chainSyncQueue.status, "completed"));
+
+  const recentFailed = await db
+    .select()
+    .from(chainSyncQueue)
+    .where(eq(chainSyncQueue.status, "failed"))
+    .orderBy(desc(chainSyncQueue.created_at))
+    .limit(20);
+
+  return c.json({
+    success: true,
+    data: {
+      pending: pendingCount[0]?.count ?? 0,
+      failed: failedCount[0]?.count ?? 0,
+      completed: completedCount[0]?.count ?? 0,
+      recent_failures: recentFailed,
+    },
+  });
+});
+
+adminRoutes.post("/admin/chain-sync/:id/retry", async (c) => {
+  const itemId = parseInt(c.req.param("id"));
+  const item = await db
+    .select()
+    .from(chainSyncQueue)
+    .where(eq(chainSyncQueue.id, itemId))
+    .limit(1);
+
+  if (!item[0]) return c.json({ success: false, error: "Queue item not found" }, 404);
+  if (item[0].status !== "failed") {
+    return c.json({ success: false, error: "Can only retry failed items" }, 400);
+  }
+
+  await db
+    .update(chainSyncQueue)
+    .set({ status: "pending", attempts: 0, last_error: null })
+    .where(eq(chainSyncQueue.id, itemId));
+
+  return c.json({ success: true, data: { id: itemId, status: "pending" } });
 });
 
 export { adminRoutes };

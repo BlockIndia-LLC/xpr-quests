@@ -4,9 +4,10 @@ import { useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import useSWR, { useSWRConfig } from "swr";
-import { ArrowLeft, Zap, CheckCircle2, Loader2, Target, Hash, Users, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Zap, CheckCircle2, Loader2, Target, Hash, Users, AlertTriangle, Link2 } from "lucide-react";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { fetcher, apiFetch } from "@/lib/api";
+import { buildClaimRewardAction, signAndSubmit } from "@/lib/contracts";
 import {
   SKILL_TREE_INFO,
   QuestStatus,
@@ -115,7 +116,7 @@ function ProgressSection({
     return (
       <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-5 mt-6 flex items-center gap-3">
         <CheckCircle2 size={24} className="text-green-400 flex-shrink-0" />
-        <div>
+        <div className="flex-1">
           <p className="text-green-400 font-semibold">
             Quest Completed &amp; Claimed
           </p>
@@ -123,6 +124,12 @@ function ProgressSection({
             You earned {quest.xp_reward} XP from this quest.
           </p>
         </div>
+        {progress.chain_synced && (
+          <div className="flex items-center gap-1 text-green-400" title="Synced on-chain">
+            <Link2 size={16} />
+            <span className="text-xs">On-chain</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -195,7 +202,7 @@ export default function QuestDetailPage() {
   const questId = params.id;
   const { mutate } = useSWRConfig();
 
-  const { account, isConnected } = useWallet();
+  const { account, isConnected, session } = useWallet();
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
 
@@ -216,18 +223,25 @@ export default function QuestDetailPage() {
   const progress = progressRes?.data ?? null;
 
   const handleClaim = useCallback(async () => {
-    if (!questId || claiming) return;
+    if (!questId || claiming || !account || !session) return;
     setClaiming(true);
     setClaimError(null);
 
     try {
+      // 1. Sign on-chain claim via wallet
+      const claimAction = buildClaimRewardAction(account, parseInt(questId));
+      const txId = await signAndSubmit(session, claimAction);
+
+      // 2. Notify backend with tx_id
       await apiFetch(`/api/quests/${questId}/claim`, {
         method: "POST",
+        body: JSON.stringify({ tx_id: txId }),
       });
+
       // Revalidate quest and progress data
       mutate(`/api/quests/${questId}`);
       mutate(`/api/quests/${questId}/progress`);
-      if (account) mutate(`/api/profile/${account}`);
+      mutate(`/api/profile/${account}`);
     } catch (err) {
       setClaimError(
         err instanceof Error ? err.message : "Failed to claim reward",
@@ -235,7 +249,7 @@ export default function QuestDetailPage() {
     } finally {
       setClaiming(false);
     }
-  }, [questId, claiming, mutate, account]);
+  }, [questId, claiming, mutate, account, session]);
 
   if (questLoading || (isConnected && progressLoading)) {
     return <QuestDetailSkeleton />;

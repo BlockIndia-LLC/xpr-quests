@@ -90,6 +90,8 @@ questRoutes.get("/quests/:id", optionalAuth, async (c) => {
 questRoutes.post("/quests/:id/claim", authMiddleware, rateLimitMiddleware, async (c) => {
   const questId = parseInt(c.req.param("id"));
   const account = c.get("account") as string;
+  const body = await c.req.json().catch(() => ({}));
+  const txId = (body as Record<string, unknown>).tx_id as string | undefined;
 
   // Check progress
   const prog = await db
@@ -110,10 +112,13 @@ questRoutes.post("/quests/:id/claim", authMiddleware, rateLimitMiddleware, async
     return c.json({ success: false, error: "Already claimed" }, 400);
   }
 
-  // Mark as claimed in DB
+  // Mark as claimed in DB, set chain_synced if tx_id provided
   await db
     .update(progress)
-    .set({ claimed: true })
+    .set({
+      claimed: true,
+      chain_synced: !!txId,
+    })
     .where(
       and(eq(progress.user_name, account), eq(progress.quest_id, questId)),
     );
@@ -139,6 +144,8 @@ questRoutes.post("/quests/:id/claim", authMiddleware, rateLimitMiddleware, async
       quest_id: Number(questId),
       xp_reward: quest[0]?.xp_reward ?? 0,
       claimed: true,
+      chain_synced: !!txId,
+      tx_id: txId || null,
     },
   });
 });

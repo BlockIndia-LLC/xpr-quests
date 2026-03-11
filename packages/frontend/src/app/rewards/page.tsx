@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Gift, Zap, AlertTriangle, History, ShoppingBag } from "lucide-react";
+import Link from "next/link";
+import { Gift, Zap, AlertTriangle, History, ShoppingBag, Trophy } from "lucide-react";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { useProfile } from "@/hooks/useProfile";
 import { usePerks, useRedemptionHistory, redeemPerk } from "@/hooks/usePerks";
@@ -128,6 +129,29 @@ export default function RewardsPage() {
           </span>
         )}
       </div>
+
+      {/* Season Rewards CTA */}
+      <Link
+        href="/rewards/seasons"
+        className="mb-8 flex items-center justify-between bg-background-card rounded-xl border border-surface-border p-5 hover:border-accent-purple/50 transition-colors group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-accent-purple/20 flex items-center justify-center">
+            <Trophy size={20} className="text-accent-purple" />
+          </div>
+          <div>
+            <p className="font-semibold text-white group-hover:text-accent-purple transition-colors">
+              Season Rewards
+            </p>
+            <p className="text-sm text-gray-500">
+              Claim XPR token rewards from completed seasons
+            </p>
+          </div>
+        </div>
+        <span className="text-gray-500 group-hover:text-accent-purple transition-colors">
+          &rarr;
+        </span>
+      </Link>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-8">

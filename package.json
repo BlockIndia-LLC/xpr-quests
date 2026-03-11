@@ -9,7 +9,10 @@
     "lint": "pnpm -r lint",
     "db:generate": "pnpm --filter @xpr-quests/backend drizzle-kit generate",
     "db:migrate": "pnpm --filter @xpr-quests/backend drizzle-kit migrate",
-    "db:seed": "pnpm --filter @xpr-quests/backend tsx src/db/seed.ts"
+    "db:seed": "pnpm --filter @xpr-quests/backend tsx src/db/seed.ts",
+    "contracts:build": "bash scripts/build-contracts.sh",
+    "contracts:test": "cd contracts/xprquests && pnpm test && cd ../xprquestxp && pnpm test && cd ../xprseasons && pnpm test",
+    "contracts:deploy": "bash scripts/deploy-testnet.sh"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

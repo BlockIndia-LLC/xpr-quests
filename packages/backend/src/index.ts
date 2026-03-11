@@ -17,6 +17,8 @@ import { notificationsRoutes } from "./routes/notifications.js";
 import { adminRoutes } from "./routes/admin.js";
 import { startWebSocketServer } from "./ws/events.js";
 import { startHyperionListener } from "./lib/hyperion.js";
+import { startChainSyncProcessor } from "./chain/sync.js";
+import { startKYCSyncJob } from "./chain/kyc-sync.js";
 
 const app = new Hono();
 
@@ -79,5 +81,11 @@ startWebSocketServer(server as any);
 startHyperionListener().catch((err) => {
   console.error("[Hyperion] Failed to start listener:", err);
 });
+
+// Start chain sync queue processor
+startChainSyncProcessor();
+
+// Start KYC multiplier sync job
+startKYCSyncJob();
 
 export default app;

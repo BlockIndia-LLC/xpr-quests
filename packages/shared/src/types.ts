@@ -139,6 +139,7 @@ export interface QuestProgress {
   completed: boolean;
   completed_at: string | null;
   claimed: boolean;
+  chain_synced?: boolean;
 }
 
 export interface UserProfile {
@@ -340,3 +341,42 @@ export interface Report {
 }
 
 export const REQUIRED_PROOF_APPROVALS = 3;
+
+// ============================================================
+// Phase 4 — On-chain integration types
+// ============================================================
+
+export enum ChainSyncStatus {
+  PENDING = 0,
+  SYNCED = 1,
+  FAILED = 2,
+}
+
+export interface SeasonRewardTier {
+  rank_start: number;
+  rank_end: number;
+  xpr_per_user: string;
+}
+
+export interface SeasonRewardClaim {
+  season_id: number;
+  user_name: string;
+  rank: number;
+  reward_amount: string;
+  claimed: boolean;
+  claimed_at: string | null;
+  tx_id: string | null;
+}
+
+export interface ChainSyncQueueItem {
+  id: number;
+  action_type: string;
+  action_data: Record<string, unknown>;
+  status: string;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  tx_id: string | null;
+  created_at: string;
+  processed_at: string | null;
+}

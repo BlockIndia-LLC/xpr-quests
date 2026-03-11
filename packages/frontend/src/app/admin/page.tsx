@@ -10,6 +10,12 @@ import {
   Flag,
   Gift,
   Calendar,
+  Link2,
+  RefreshCw,
+  Loader2,
+  Play,
+  StopCircle,
+  Trophy,
 } from "lucide-react";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { apiFetch } from "@/lib/api";
@@ -17,7 +23,7 @@ import { useToastStore } from "@/stores/toastStore";
 import type { Quest } from "@xpr-quests/shared";
 import clsx from "clsx";
 
-type Tab = "quests" | "analytics" | "reports" | "perks" | "seasons";
+type Tab = "quests" | "analytics" | "reports" | "perks" | "seasons" | "chain-sync";
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "quests", label: "Quest Approval", icon: CheckCircle },
@@ -25,6 +31,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: "reports", label: "Reports", icon: Flag },
   { key: "perks", label: "Perks", icon: Gift },
   { key: "seasons", label: "Seasons", icon: Calendar },
+  { key: "chain-sync", label: "Chain Sync", icon: Link2 },
 ];
 
 export default function AdminPage() {
@@ -33,7 +40,10 @@ export default function AdminPage() {
   const [draftQuests, setDraftQuests] = useState<Quest[]>([]);
   const [analytics, setAnalytics] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
+  const [chainSync, setChainSync] = useState<any>(null);
+  const [seasons, setSeasons] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const addToast = useToastStore((s) => s.addToast);
 
@@ -60,6 +70,16 @@ export default function AdminPage() {
         case "reports": {
           const res = await apiFetch<{ data: any[] }>("/api/admin/reports");
           setReports(res.data ?? []);
+          break;
+        }
+        case "chain-sync": {
+          const res = await apiFetch<{ data: any }>("/api/admin/chain-sync");
+          setChainSync(res.data ?? null);
+          break;
+        }
+        case "seasons": {
+          const res = await apiFetch<{ data: any[] }>("/api/seasons");
+          setSeasons(res.data ?? []);
           break;
         }
       }
@@ -89,6 +109,64 @@ export default function AdminPage() {
       setDraftQuests((prev) => prev.filter((q) => q.quest_id !== questId));
     } catch (err: any) {
       addToast({ type: "error", message: err.message });
+    }
+  };
+
+  const retryChainSync = async (itemId: number) => {
+    try {
+      setActionLoading(`retry-${itemId}`);
+      await apiFetch(`/api/admin/chain-sync/${itemId}/retry`, {
+        method: "POST",
+      });
+      addToast({ type: "success", message: "Queued for retry" });
+      loadData();
+    } catch (err: any) {
+      addToast({ type: "error", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const activateSeason = async (seasonId: number) => {
+    try {
+      setActionLoading(`activate-${seasonId}`);
+      await apiFetch(`/api/admin/seasons/${seasonId}/activate`, {
+        method: "POST",
+      });
+      addToast({ type: "success", message: "Season activated" });
+      loadData();
+    } catch (err: any) {
+      addToast({ type: "error", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const endSeason = async (seasonId: number) => {
+    try {
+      setActionLoading(`end-${seasonId}`);
+      await apiFetch(`/api/seasons/${seasonId}/end`, { method: "POST" });
+      addToast({ type: "success", message: "Season ended, rankings computed" });
+      loadData();
+    } catch (err: any) {
+      addToast({ type: "error", message: err.message });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const distributeSeason = async (seasonId: number) => {
+    try {
+      setActionLoading(`distribute-${seasonId}`);
+      await apiFetch(`/api/seasons/${seasonId}/distribute`, {
+        method: "POST",
+      });
+      addToast({ type: "success", message: "Rewards distributed" });
+      loadData();
+    } catch (err: any) {
+      addToast({ type: "error", message: err.message });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -338,13 +416,203 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* Seasons Tab — placeholder */}
+          {/* Seasons Tab */}
           {activeTab === "seasons" && (
+            <div className="space-y-4">
+              {seasons.length > 0 ? (
+                seasons.map((season: any) => (
+                  <div
+                    key={season.season_id}
+                    className="bg-background-card rounded-lg border border-surface-border p-5"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold text-white">
+                            {season.title}
+                          </h3>
+                          <span
+                            className={clsx(
+                              "px-2 py-0.5 rounded-full text-xs font-medium",
+                              season.status === 0
+                                ? "bg-blue-500/20 text-blue-400"
+                                : season.status === 1
+                                  ? "bg-green-500/20 text-green-400"
+                                  : season.status === 2
+                                    ? "bg-yellow-500/20 text-yellow-400"
+                                    : "bg-accent-purple/20 text-accent-purple",
+                            )}
+                          >
+                            {["Upcoming", "Active", "Ended", "Distributed"][
+                              season.status
+                            ] ?? "Unknown"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          {new Date(season.start_time).toLocaleDateString()} —{" "}
+                          {new Date(season.end_time).toLocaleDateString()} | Pool:{" "}
+                          {season.reward_pool}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 ml-4 flex-shrink-0">
+                        {season.status === 0 && (
+                          <button
+                            onClick={() => activateSeason(season.season_id)}
+                            disabled={actionLoading === `activate-${season.season_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-500/20 text-green-400 text-sm hover:bg-green-500/30 transition-colors"
+                          >
+                            {actionLoading === `activate-${season.season_id}` ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Play size={14} />
+                            )}
+                            Start
+                          </button>
+                        )}
+                        {season.status === 1 && (
+                          <button
+                            onClick={() => endSeason(season.season_id)}
+                            disabled={actionLoading === `end-${season.season_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/20 text-yellow-400 text-sm hover:bg-yellow-500/30 transition-colors"
+                          >
+                            {actionLoading === `end-${season.season_id}` ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <StopCircle size={14} />
+                            )}
+                            End
+                          </button>
+                        )}
+                        {season.status === 2 && (
+                          <button
+                            onClick={() => distributeSeason(season.season_id)}
+                            disabled={
+                              actionLoading === `distribute-${season.season_id}`
+                            }
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-purple/20 text-accent-purple text-sm hover:bg-accent-purple/30 transition-colors"
+                          >
+                            {actionLoading ===
+                            `distribute-${season.season_id}` ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Trophy size={14} />
+                            )}
+                            Distribute
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="card text-center py-12">
+                  <Calendar
+                    size={28}
+                    className="mx-auto text-gray-500 mb-3"
+                  />
+                  <p className="text-gray-400">No seasons created yet.</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Use POST /api/admin/seasons to create one.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Chain Sync Tab */}
+          {activeTab === "chain-sync" && chainSync && (
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-background-card rounded-lg border border-surface-border p-5 text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                    Pending
+                  </p>
+                  <p className="text-2xl font-bold text-yellow-400">
+                    {chainSync.pending}
+                  </p>
+                </div>
+                <div className="bg-background-card rounded-lg border border-surface-border p-5 text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                    Completed
+                  </p>
+                  <p className="text-2xl font-bold text-green-400">
+                    {chainSync.completed}
+                  </p>
+                </div>
+                <div className="bg-background-card rounded-lg border border-surface-border p-5 text-center">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                    Failed
+                  </p>
+                  <p className="text-2xl font-bold text-red-400">
+                    {chainSync.failed}
+                  </p>
+                </div>
+              </div>
+
+              {/* Recent failures */}
+              {chainSync.recent_failures?.length > 0 ? (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+                    Recent Failures
+                  </h3>
+                  <div className="space-y-2">
+                    {chainSync.recent_failures.map((item: any) => (
+                      <div
+                        key={item.id}
+                        className="bg-background-card rounded-lg border border-red-500/20 p-4 flex items-center justify-between"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-mono text-white">
+                              {item.action_type}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {item.attempts}/{item.max_attempts} attempts
+                            </span>
+                          </div>
+                          <p className="text-xs text-red-400 truncate mt-1">
+                            {item.last_error}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(item.created_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => retryChainSync(item.id)}
+                          disabled={actionLoading === `retry-${item.id}`}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-cyan/20 text-accent-cyan text-sm hover:bg-accent-cyan/30 transition-colors ml-4 flex-shrink-0"
+                        >
+                          {actionLoading === `retry-${item.id}` ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : (
+                            <RefreshCw size={14} />
+                          )}
+                          Retry
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="card text-center py-8">
+                  <CheckCircle
+                    size={24}
+                    className="mx-auto text-green-400 mb-2"
+                  />
+                  <p className="text-gray-400 text-sm">
+                    No failed sync items.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "chain-sync" && !chainSync && !loading && (
             <div className="card text-center py-12">
-              <Calendar size={28} className="mx-auto text-gray-500 mb-3" />
+              <Link2 size={28} className="mx-auto text-gray-500 mb-3" />
               <p className="text-gray-400">
-                Season management via API. Use POST /api/admin/seasons to
-                create.
+                Chain sync data unavailable.
               </p>
             </div>
           )}

@@ -18,6 +18,8 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.split(",").map((s) => s.trim()).filter(Boolean)),
   SERVER_PRIVATE_KEY: z.string().default(""),
+  XP_CONTRACT_ACCOUNT: z.string().default("xprquestxp"),
+  SEASONS_CONTRACT_ACCOUNT: z.string().default("xprseasons"),
   BACKEND_PORT: z
     .string()
     .default("3000")

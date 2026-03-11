@@ -11,6 +11,7 @@ import {
 } from "../db/schema.js";
 import { broadcastToUser } from "../ws/events.js";
 import { checkKYCStatus } from "../chain/tables.js";
+import { enqueueChainAction } from "../chain/sync.js";
 import {
   calculateLevel,
   calculateTier,
@@ -158,6 +159,12 @@ async function processQuestForUser(
       completed_at: completed ? new Date() : null,
     })
     .where(eq(progress.id, prog[0].id));
+
+  // Enqueue on-chain progress sync
+  await enqueueChainAction("recordprog", {
+    user: actor,
+    quest_id: Number(questId),
+  });
 
   // Broadcast progress update via WebSocket
   const progressEvent: WsEvent = {
@@ -366,6 +373,14 @@ async function awardXPOffChain(
         },
       });
   }
+
+  // Enqueue on-chain XP sync
+  await enqueueChainAction("addxp", {
+    user: account,
+    amount: boostedXP,
+    skill_tree: skillTree,
+    season_id: seasonId,
+  });
 }
 
 async function checkCompositeQuests(

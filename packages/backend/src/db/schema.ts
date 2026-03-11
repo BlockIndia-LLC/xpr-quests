@@ -79,6 +79,7 @@ export const progress = pgTable(
     completed: boolean("completed"),
     completed_at: timestamp("completed_at", { withTimezone: true }),
     claimed: boolean("claimed"),
+    chain_synced: boolean("chain_synced").default(false),
   },
   (table) => [
     uniqueIndex("uq_progress_user_quest").on(table.user_name, table.quest_id),
@@ -223,6 +224,47 @@ export const proofSubmissions = pgTable(
   (table) => [
     uniqueIndex("uq_proof_user_quest").on(table.user_name, table.quest_id),
     index("idx_proof_status").on(table.status),
+  ],
+);
+
+// ─── Chain Sync Queue ───────────────────────────────────────────────────────
+
+export const chainSyncQueue = pgTable(
+  "chain_sync_queue",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    action_type: varchar("action_type", { length: 30 }).notNull(),
+    action_data: jsonb("action_data").notNull(),
+    status: varchar("status", { length: 20 }).default("pending"),
+    attempts: integer("attempts").default(0),
+    max_attempts: integer("max_attempts").default(5),
+    last_error: text("last_error"),
+    tx_id: varchar("tx_id", { length: 64 }),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+    processed_at: timestamp("processed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_chain_sync_status").on(table.status),
+  ],
+);
+
+// ─── Season Rewards ─────────────────────────────────────────────────────────
+
+export const seasonRewards = pgTable(
+  "season_rewards",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    season_id: integer("season_id").notNull(),
+    user_name: varchar("user_name", { length: 13 }).notNull(),
+    rank: integer("rank").notNull(),
+    reward_amount: varchar("reward_amount", { length: 50 }).notNull(),
+    claimed: boolean("claimed").default(false),
+    claimed_at: timestamp("claimed_at", { withTimezone: true }),
+    tx_id: varchar("tx_id", { length: 64 }),
+  },
+  (table) => [
+    uniqueIndex("uq_season_reward_user").on(table.season_id, table.user_name),
+    index("idx_season_rewards_season").on(table.season_id),
   ],
 );
 

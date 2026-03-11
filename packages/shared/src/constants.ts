@@ -94,3 +94,16 @@ export const ANTI_SYBIL = {
 // ============================================================
 
 export const NFT_COLLECTION = "xprquestbdg" as const;
+export const BADGE_SCHEMA = "questbadges" as const;
+
+// ============================================================
+// Season reward distribution tiers (10,000 XPR total)
+// ============================================================
+
+import type { SeasonRewardTier } from "./types";
+
+export const SEASON_REWARD_TIERS: SeasonRewardTier[] = [
+  { rank_start: 1, rank_end: 10, xpr_per_user: "300.0000 XPR" },    // 3,000 XPR
+  { rank_start: 11, rank_end: 100, xpr_per_user: "50.0000 XPR" },   // 4,500 XPR
+  { rank_start: 101, rank_end: 500, xpr_per_user: "6.2500 XPR" },   // 2,500 XPR
+] as const;                                                           // Total: 10,000 XPR

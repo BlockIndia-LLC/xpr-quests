@@ -302,6 +302,29 @@ class XprQuests extends Contract {
     );
 
     action.send();
+
+    // Mint NFT badge if template is configured
+    if (quest!.nft_template_id > 0 && quest!.nft_collection != EMPTY_NAME) {
+      const atomicAssets = Name.fromString("atomicassets");
+      const mintAction = Name.fromString("mintasset");
+
+      const mintData = new MintAssetActionData(
+        this.receiver,       // authorized_minter
+        quest!.nft_collection,
+        Name.fromString("questbadges"),
+        quest!.nft_template_id,
+        user,                // new_asset_owner
+      );
+
+      const mintAct = new Action(
+        atomicAssets,
+        mintAction,
+        [new PermissionLevel(this.receiver, Name.fromString("active"))],
+        mintData.pack(),
+      );
+
+      mintAct.send();
+    }
   }
 
   /**
@@ -350,5 +373,16 @@ class AddXPActionData {
     public amount: u32 = 0,
     public skill_tree: Name = EMPTY_NAME,
     public season_id: u32 = 0,
+  ) {}
+}
+
+@packer
+class MintAssetActionData {
+  constructor(
+    public authorized_minter: Name = EMPTY_NAME,
+    public collection_name: Name = EMPTY_NAME,
+    public schema_name: Name = EMPTY_NAME,
+    public template_id: i32 = 0,
+    public new_asset_owner: Name = EMPTY_NAME,
   ) {}
 }

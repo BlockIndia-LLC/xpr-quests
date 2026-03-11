@@ -1,0 +1,20 @@
+{
+  "name": "xprseasons-contract",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "npx proton-tsc assembly/xprseasons.contract.ts",
+    "test": "mocha --require ts-node/register tests/**/*.spec.ts --timeout 30000"
+  },
+  "dependencies": {
+    "proton-tsc": "^0.3.58"
+  },
+  "devDependencies": {
+    "@proton/vert": "^0.3.0",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "chai": "^4.3.0",
+    "mocha": "^10.2.0",
+    "ts-node": "^10.9.0"
+  }
+}
