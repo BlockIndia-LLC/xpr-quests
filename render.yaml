@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: xpr-quests-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: pnpm install && pnpm --filter @xpr-quests/shared build && pnpm --filter @xpr-quests/backend build
+    startCommand: node packages/backend/dist/index.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: XPR_RPC_ENDPOINT
+        value: https://protontestnet.ledgerwise.io
+      - key: XPR_HYPERION_ENDPOINT
+        value: https://protontestnet.ledgerwise.io
+      - key: XPR_NETWORK
+        value: testnet
+      - key: CONTRACT_ACCOUNT
+        value: xprquests
+      - key: ADMIN_ACCOUNTS
+        value: prem
+      - key: CORS_ORIGINS
+        sync: false
+      - key: BACKEND_PORT
+        value: "10000"

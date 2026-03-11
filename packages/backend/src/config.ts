@@ -20,6 +20,10 @@ const envSchema = z.object({
   SERVER_PRIVATE_KEY: z.string().default(""),
   XP_CONTRACT_ACCOUNT: z.string().default("xprquestxp"),
   SEASONS_CONTRACT_ACCOUNT: z.string().default("xprseasons"),
+  CORS_ORIGINS: z
+    .string()
+    .default("http://localhost:3001,http://localhost:3000")
+    .transform((val) => val.split(",").map((s) => s.trim()).filter(Boolean)),
   BACKEND_PORT: z
     .string()
     .default("3000")
