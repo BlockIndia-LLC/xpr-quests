@@ -269,3 +269,74 @@ export interface WsEvent {
     title?: string;
   };
 }
+
+// ============================================================
+// Phase 3 — Perks, Notifications, Proofs, Reports
+// ============================================================
+
+export interface Perk {
+  perk_id: number;
+  partner: string;
+  title: string;
+  description: string;
+  icon_url: string | null;
+  xp_cost: number;
+  max_redemptions: number;
+  redeemed_count: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface Redemption {
+  id: number;
+  user_name: string;
+  perk_id: number;
+  xp_spent: number;
+  redeemed_at: string;
+  // Joined fields
+  perk_title?: string;
+  perk_partner?: string;
+}
+
+export interface Notification {
+  id: number;
+  user_name: string;
+  event_type: string;
+  title: string;
+  body: string | null;
+  quest_id: number | null;
+  read: boolean;
+  created_at: string;
+}
+
+export enum ProofStatus {
+  PENDING = 0,
+  APPROVED = 1,
+  REJECTED = 2,
+}
+
+export interface ProofSubmission {
+  id: number;
+  user_name: string;
+  quest_id: number;
+  proof_url: string;
+  notes: string | null;
+  status: ProofStatus;
+  approvals: number;
+  rejections: number;
+  reviewed_by: string[];
+  created_at: string;
+}
+
+export interface Report {
+  id: number;
+  reporter: string;
+  reported_user: string;
+  reason: string;
+  evidence: string | null;
+  resolved: boolean;
+  resolved_by: string | null;
+  created_at: string;
+}
+
+export const REQUIRED_PROOF_APPROVALS = 3;

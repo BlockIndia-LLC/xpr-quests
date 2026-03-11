@@ -203,3 +203,45 @@ export const questMetrics = pgTable("quest_metrics", {
   completion_rate: real("completion_rate"),
   updated_at: timestamp("updated_at", { withTimezone: true }),
 });
+
+// ─── Proof Submissions (Type 4 Community Verified) ──────────────────────────
+
+export const proofSubmissions = pgTable(
+  "proof_submissions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    user_name: varchar("user_name", { length: 13 }).notNull(),
+    quest_id: bigint("quest_id", { mode: "number" }).notNull(),
+    proof_url: text("proof_url").notNull(),
+    notes: text("notes"),
+    status: smallint("status").default(0), // 0=pending, 1=approved, 2=rejected
+    approvals: integer("approvals").default(0),
+    rejections: integer("rejections").default(0),
+    reviewed_by: text("reviewed_by").array().default([]),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uq_proof_user_quest").on(table.user_name, table.quest_id),
+    index("idx_proof_status").on(table.status),
+  ],
+);
+
+// ─── Community Reports ──────────────────────────────────────────────────────
+
+export const reports = pgTable(
+  "reports",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    reporter: varchar("reporter", { length: 13 }).notNull(),
+    reported_user: varchar("reported_user", { length: 13 }).notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    evidence: text("evidence"),
+    resolved: boolean("resolved").default(false),
+    resolved_by: varchar("resolved_by", { length: 13 }),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_reports_resolved").on(table.resolved),
+    index("idx_reports_reported_user").on(table.reported_user),
+  ],
+);

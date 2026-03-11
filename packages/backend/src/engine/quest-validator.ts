@@ -7,6 +7,7 @@ import {
   skillXp,
   seasonXp,
   questMetrics,
+  notifications,
 } from "../db/schema.js";
 import { broadcastToUser } from "../ws/events.js";
 import { checkKYCStatus } from "../chain/tables.js";
@@ -180,6 +181,16 @@ async function processQuestForUser(
       })
       .where(eq(questMetrics.quest_id, questId));
 
+    // Create DB notification
+    await db.insert(notifications).values({
+      user_name: actor,
+      event_type: "quest_completed",
+      title: `Quest Completed: ${quest.title}`,
+      body: `You earned ${quest.xp_reward} XP`,
+      quest_id: questId,
+      created_at: new Date(),
+    });
+
     // Auto-award off-chain XP
     await awardXPOffChain(
       actor,
@@ -287,17 +298,31 @@ async function awardXPOffChain(
       })
       .where(eq(users.name, account));
 
-    // Broadcast level/tier up events
+    // Broadcast level/tier up events + create notifications
     if (newLevel > oldLevel) {
       broadcastToUser(account, {
         type: "level_up",
         data: { account, new_level: newLevel },
+      });
+      await db.insert(notifications).values({
+        user_name: account,
+        event_type: "level_up",
+        title: `Level Up! You are now level ${newLevel}`,
+        body: null,
+        created_at: new Date(),
       });
     }
     if (newTier > oldTier) {
       broadcastToUser(account, {
         type: "tier_up",
         data: { account, new_tier: newTier },
+      });
+      await db.insert(notifications).values({
+        user_name: account,
+        event_type: "tier_up",
+        title: `Tier Promotion! You are now ${getTierName(newTier)}`,
+        body: null,
+        created_at: new Date(),
       });
     }
   }

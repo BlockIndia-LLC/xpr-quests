@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { users, progress, skillXp } from "../db/schema.js";
+import { users, progress, skillXp, reports } from "../db/schema.js";
 import { cacheGet, cacheSet } from "../redis/client.js";
+import { authMiddleware } from "../middleware/auth.js";
 import {
   calculateLevel,
   calculateTier,
@@ -10,7 +11,8 @@ import {
   xpProgress,
 } from "@xpr-quests/shared";
 
-const profileRoutes = new Hono();
+type Variables = { account: string };
+const profileRoutes = new Hono<{ Variables: Variables }>();
 
 // GET /profile/:name - public profile
 profileRoutes.get("/profile/:name", async (c) => {
@@ -90,6 +92,32 @@ profileRoutes.get("/profile/:name", async (c) => {
 
   await cacheSet(cacheKey, response, 30);
   return c.json(response);
+});
+
+// POST /reports — report a user (auth required)
+profileRoutes.post("/reports", authMiddleware, async (c) => {
+  const reporter = c.get("account");
+  const body = await c.req.json();
+
+  if (!body.reported_user) {
+    return c.json({ success: false, error: "reported_user is required" }, 400);
+  }
+  if (!body.reason || body.reason.length > 500) {
+    return c.json({ success: false, error: "reason is required (max 500 characters)" }, 400);
+  }
+  if (body.reported_user === reporter) {
+    return c.json({ success: false, error: "Cannot report yourself" }, 400);
+  }
+
+  await db.insert(reports).values({
+    reporter,
+    reported_user: body.reported_user,
+    reason: body.reason,
+    evidence: body.evidence || null,
+    resolved: false,
+  });
+
+  return c.json({ success: true, data: { message: "Report submitted" } }, 201);
 });
 
 export { profileRoutes };

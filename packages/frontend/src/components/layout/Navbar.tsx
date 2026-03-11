@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { ConnectButton } from "@/components/wallet/ConnectButton";
+import { NotificationBell } from "@/components/shared/NotificationBell";
+import { useWallet } from "@/components/wallet/WalletProvider";
 import clsx from "clsx";
 
 const NAV_LINKS = [
@@ -12,11 +14,14 @@ const NAV_LINKS = [
   { href: "/quests", label: "Quests" },
   { href: "/skill-trees", label: "Skill Trees" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/rewards", label: "Rewards" },
+  { href: "/create", label: "Create" },
 ];
 
 export function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
+  const { isConnected } = useWallet();
 
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur border-b border-surface-border">
@@ -46,8 +51,9 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* Desktop connect button */}
-        <div className="hidden md:block">
+        {/* Desktop connect button + notifications */}
+        <div className="hidden md:flex items-center gap-2">
+          {isConnected && <NotificationBell />}
           <ConnectButton />
         </div>
 

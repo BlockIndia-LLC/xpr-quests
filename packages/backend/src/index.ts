@@ -11,6 +11,10 @@ import { authRoutes } from "./routes/auth.js";
 import { leaderboardRoutes } from "./routes/leaderboard.js";
 import { seasonRoutes } from "./routes/seasons.js";
 import { skillTreeRoutes } from "./routes/skill-trees.js";
+import { createRoutes } from "./routes/create.js";
+import { perksRoutes } from "./routes/perks.js";
+import { notificationsRoutes } from "./routes/notifications.js";
+import { adminRoutes } from "./routes/admin.js";
 import { startWebSocketServer } from "./ws/events.js";
 import { startHyperionListener } from "./lib/hyperion.js";
 
@@ -38,6 +42,10 @@ app.route("/api", profileRoutes);
 app.route("/api", leaderboardRoutes);
 app.route("/api", seasonRoutes);
 app.route("/api", skillTreeRoutes);
+app.route("/api", createRoutes);
+app.route("/api", perksRoutes);
+app.route("/api", notificationsRoutes);
+app.route("/api", adminRoutes);
 
 // ── 404 handler ──────────────────────────────────────────────────────────────
 

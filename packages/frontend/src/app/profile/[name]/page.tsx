@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Shield, Award, Zap, TrendingUp, AlertTriangle, Crown, Lock } from "lucide-react";
+import { Shield, Award, Zap, TrendingUp, AlertTriangle, Crown, Lock, Flag } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import { useWallet } from "@/components/wallet/WalletProvider";
+import { apiFetch } from "@/lib/api";
+import { useToastStore } from "@/stores/toastStore";
 import {
   SKILL_TREE_INFO,
   SKILL_TREES,
@@ -144,9 +147,34 @@ function SkillBar({
 export default function ProfilePage() {
   const params = useParams<{ name: string }>();
   const name = params.name;
+  const { account, isConnected } = useWallet();
+  const addToast = useToastStore((s) => s.addToast);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reporting, setReporting] = useState(false);
 
   const { data, isLoading, error } = useProfile(name);
   const profile = data?.data ?? null;
+
+  const isOwnProfile = isConnected && account === name;
+
+  const handleReport = async () => {
+    if (!reportReason.trim()) return;
+    setReporting(true);
+    try {
+      await apiFetch("/api/reports", {
+        method: "POST",
+        body: JSON.stringify({ reported_user: name, reason: reportReason }),
+      });
+      addToast({ type: "success", message: "Report submitted" });
+      setReportOpen(false);
+      setReportReason("");
+    } catch (err: any) {
+      addToast({ type: "error", message: err.message });
+    } finally {
+      setReporting(false);
+    }
+  };
 
   const progressPct = useMemo(() => {
     if (!profile) return 0;
@@ -206,10 +234,51 @@ export default function ProfilePage() {
       {/* Profile header card                                              */}
       {/* ================================================================ */}
       <section className="card glow-border space-y-5">
-        {/* Account name */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">
-          @{profile.account}
-        </h1>
+        {/* Account name + Report */}
+        <div className="flex items-start justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
+            @{profile.account}
+          </h1>
+          {isConnected && !isOwnProfile && (
+            <button
+              onClick={() => setReportOpen(!reportOpen)}
+              className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              title="Report user"
+            >
+              <Flag size={16} />
+            </button>
+          )}
+        </div>
+
+        {/* Report form */}
+        {reportOpen && (
+          <div className="bg-background-elevated rounded-lg border border-surface-border p-4 space-y-3">
+            <p className="text-sm font-medium text-gray-300">Report @{name}</p>
+            <textarea
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="Describe the issue..."
+              maxLength={500}
+              rows={3}
+              className="w-full bg-surface border border-surface-border rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accent-purple resize-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setReportOpen(false); setReportReason(""); }}
+                className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReport}
+                disabled={!reportReason.trim() || reporting}
+                className="px-4 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50"
+              >
+                {reporting ? "Submitting..." : "Submit Report"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tier badge + Level */}
         <div className="flex flex-wrap items-center gap-3">

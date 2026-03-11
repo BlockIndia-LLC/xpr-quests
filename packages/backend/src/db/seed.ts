@@ -8,7 +8,7 @@ config({ path: resolve(process.cwd(), ".env") });
 async function seed() {
   // Dynamic imports so DATABASE_URL from .env is loaded first
   const { db } = await import("./index.js");
-  const { quests, skillTrees, seasons } = await import("./schema.js");
+  const { quests, skillTrees, seasons, perks } = await import("./schema.js");
   const { eq } = await import("drizzle-orm");
   const {
     NEW_BRANCH_QUESTS,
@@ -301,6 +301,53 @@ async function seed() {
   }
 
   console.log("Updated skill tree branch_order arrays.");
+
+  // ── Seed partner perks ─────────────────────────────────────────────────────
+
+  const samplePerks = [
+    {
+      partner: "xprcasino",
+      title: "Free Spin Pack",
+      description: "Redeem 5 free spins on XPR Casino slots",
+      xp_cost: 500,
+      max_redemptions: 1000,
+    },
+    {
+      partner: "metalx",
+      title: "Trading Fee Discount",
+      description: "Get 50% off trading fees on Metal X for 7 days",
+      xp_cost: 1000,
+      max_redemptions: 500,
+    },
+    {
+      partner: "xprquests",
+      title: "Quest Booster",
+      description: "Double XP on your next 3 quest completions",
+      xp_cost: 750,
+      max_redemptions: 0,
+    },
+    {
+      partner: "xprmarket",
+      title: "NFT Minting Credit",
+      description: "Free NFT minting on XPR Market (1 mint)",
+      xp_cost: 300,
+      max_redemptions: 2000,
+    },
+  ];
+
+  for (const perk of samplePerks) {
+    await db
+      .insert(perks)
+      .values({
+        ...perk,
+        redeemed_count: 0,
+        active: true,
+        created_at: new Date(),
+      })
+      .onConflictDoNothing();
+  }
+
+  console.log(`Seeded ${samplePerks.length} partner perks.`);
   console.log("Seed complete!");
   process.exit(0);
 }
