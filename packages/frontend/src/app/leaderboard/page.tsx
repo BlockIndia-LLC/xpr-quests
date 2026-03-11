@@ -191,12 +191,12 @@ export default function LeaderboardPage() {
       ) : entries.length > 0 ? (
         <>
           {/* Table header */}
-          <div className="grid grid-cols-12 gap-4 px-4 py-2 text-xs text-gray-500 uppercase tracking-wider border-b border-surface-border mb-1">
-            <div className="col-span-1">Rank</div>
-            <div className="col-span-5">User</div>
-            <div className="col-span-2 text-right">XP</div>
-            <div className="col-span-2 text-center">Level</div>
-            <div className="col-span-2 text-right">Tier</div>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-4 px-4 py-2 text-xs text-gray-500 uppercase tracking-wider border-b border-surface-border mb-1">
+            <div>Rank</div>
+            <div>User</div>
+            <div className="text-right hidden sm:block">XP</div>
+            <div className="text-center hidden md:block">Level</div>
+            <div className="text-right">Tier</div>
           </div>
 
           {/* Table rows */}
@@ -207,16 +207,16 @@ export default function LeaderboardPage() {
                 <div
                   key={entry.user}
                   className={clsx(
-                    "grid grid-cols-12 gap-4 items-center px-4 py-3 rounded-lg transition-colors",
+                    "grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-4 items-center px-4 py-3 rounded-lg transition-colors",
                     isCurrentUser
                       ? "bg-accent-purple/10 border-l-2 border-accent-purple"
                       : "hover:bg-surface",
                   )}
                 >
-                  <div className="col-span-1">
+                  <div>
                     <RankDisplay rank={entry.rank} />
                   </div>
-                  <div className="col-span-5 min-w-0">
+                  <div className="min-w-0">
                     <Link
                       href={`/profile/${entry.user}`}
                       className={clsx(
@@ -232,15 +232,15 @@ export default function LeaderboardPage() {
                       )}
                     </Link>
                   </div>
-                  <div className="col-span-2 text-right">
+                  <div className="text-right hidden sm:block">
                     <span className="text-white font-semibold">
                       {entry.xp.toLocaleString()}
                     </span>
                   </div>
-                  <div className="col-span-2 text-center text-gray-400">
+                  <div className="text-center text-gray-400 hidden md:block">
                     {entry.level}
                   </div>
-                  <div className="col-span-2 flex justify-end">
+                  <div className="flex justify-end">
                     <TierBadge tier={entry.tier as Tier} size="sm" />
                   </div>
                 </div>
@@ -250,7 +250,7 @@ export default function LeaderboardPage() {
 
           {/* Pagination */}
           {total > PAGE_SIZE && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-surface-border">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6 pt-4 border-t border-surface-border">
               <p className="text-sm text-gray-500">
                 Showing {page * PAGE_SIZE + 1}–
                 {Math.min((page + 1) * PAGE_SIZE, total)} of {total}

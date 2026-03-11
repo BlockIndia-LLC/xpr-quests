@@ -16,7 +16,7 @@ const [admin, alice, bob, charlie] = blockchain.createAccounts("admin", "alice",
  *  Helpers
  * ───────────────────────────────────────────── */
 async function setupConfig(): Promise<void> {
-  await sznContract.actions.setconfig(["admin", "xprquestxp"]).send("xprseasons@active");
+  await sznContract.actions.setconfig(["admin", "xprquestxp", "eosio.token"]).send("xprseasons@active");
 }
 
 /* ─────────────────────────────────────────────
@@ -35,12 +35,13 @@ describe("XprSeasons Contract", () => {
       expect(config.length).to.equal(1);
       expect(config[0].admin).to.equal("admin");
       expect(config[0].xp_contract).to.equal("xprquestxp");
+      expect(config[0].token_contract).to.equal("eosio.token");
       expect(config[0].next_season_id).to.equal(1);
     });
 
     it("should reject non-self auth", async () => {
       await expectToThrow(
-        sznContract.actions.setconfig(["admin", "xprquestxp"]).send("alice@active"),
+        sznContract.actions.setconfig(["admin", "xprquestxp", "eosio.token"]).send("alice@active"),
         "Missing required authority",
       );
     });
@@ -51,8 +52,8 @@ describe("XprSeasons Contract", () => {
     it("should create a season with auto-incremented ID", async () => {
       await sznContract.actions.createseason([
         "Genesis Season",
-        1700000000,     // start_time
-        1708000000,     // end_time
+        9999000000,     // start_time (far future)
+        9999900000,     // end_time
         "10000.0000 XPR",
       ]).send("admin@active");
 
@@ -67,8 +68,8 @@ describe("XprSeasons Contract", () => {
     it("should auto-increment season_id", async () => {
       await sznContract.actions.createseason([
         "Season 2",
-        1710000000,
-        1718000000,
+        9999000000,
+        9999900000,
         "5000.0000 XPR",
       ]).send("admin@active");
 
@@ -80,7 +81,7 @@ describe("XprSeasons Contract", () => {
     it("should reject non-admin auth", async () => {
       await expectToThrow(
         sznContract.actions.createseason([
-          "Bad Season", 1700000000, 1708000000, "100.0000 XPR",
+          "Bad Season", 9999000000, 9999900000, "100.0000 XPR",
         ]).send("alice@active"),
         "Missing required authority",
       );
@@ -89,7 +90,7 @@ describe("XprSeasons Contract", () => {
     it("should reject empty title", async () => {
       await expectToThrow(
         sznContract.actions.createseason([
-          "", 1700000000, 1708000000, "100.0000 XPR",
+          "", 9999000000, 9999900000, "100.0000 XPR",
         ]).send("admin@active"),
         "title cannot be empty",
       );
@@ -98,9 +99,18 @@ describe("XprSeasons Contract", () => {
     it("should reject invalid time range", async () => {
       await expectToThrow(
         sznContract.actions.createseason([
-          "Bad Time", 1708000000, 1700000000, "100.0000 XPR",
+          "Bad Time", 9999900000, 9999000000, "100.0000 XPR",
         ]).send("admin@active"),
         "end_time must be after start_time",
+      );
+    });
+
+    it("should reject start_time in the past", async () => {
+      await expectToThrow(
+        sznContract.actions.createseason([
+          "Past Season", 1, 9999900000, "100.0000 XPR",
+        ]).send("admin@active"),
+        "start_time must be in the future",
       );
     });
   });
@@ -188,6 +198,25 @@ describe("XprSeasons Contract", () => {
         "users and xps must have same length",
       );
     });
+
+    it("should reject empty users array", async () => {
+      await expectToThrow(
+        sznContract.actions.snapshot([
+          1, [], [], [],
+        ]).send("admin@active"),
+        "users array cannot be empty",
+      );
+    });
+
+    it("should reject duplicate user in snapshot", async () => {
+      // alice was already snapshotted above
+      await expectToThrow(
+        sznContract.actions.snapshot([
+          1, ["alice"], [9999], [1],
+        ]).send("admin@active"),
+        "duplicate user in snapshot",
+      );
+    });
   });
 
   // ─── distribute ────────────────────────────
@@ -218,6 +247,22 @@ describe("XprSeasons Contract", () => {
           2, ["alice"], ["100.0000 XPR"],
         ]).send("admin@active"),
         "season must be ended before distribution",
+      );
+    });
+
+    it("should reject empty users array", async () => {
+      // Create and end a new season for this test
+      await sznContract.actions.createseason([
+        "Season 3", 9999000000, 9999900000, "1000.0000 XPR",
+      ]).send("admin@active");
+      await sznContract.actions.startseason([3]).send("admin@active");
+      await sznContract.actions.endseason([3]).send("admin@active");
+
+      await expectToThrow(
+        sznContract.actions.distribute([
+          3, [], [],
+        ]).send("admin@active"),
+        "users array cannot be empty",
       );
     });
   });
@@ -256,12 +301,13 @@ describe("XprSeasons Contract", () => {
   // ─── config update ────────────────────────
   describe("config update", () => {
     it("should update existing config", async () => {
-      await sznContract.actions.setconfig(["bob", "xprquestxp"]).send("xprseasons@active");
+      await sznContract.actions.setconfig(["bob", "xprquestxp", "eosio.token"]).send("xprseasons@active");
 
       const config = sznContract.tables.sznconfig().getTableRows();
       expect(config[0].admin).to.equal("bob");
+      expect(config[0].token_contract).to.equal("eosio.token");
       // next_season_id should be preserved
-      expect(config[0].next_season_id).to.equal(3); // after creating 2 seasons
+      expect(config[0].next_season_id).to.equal(4); // after creating 3 seasons
     });
   });
 });

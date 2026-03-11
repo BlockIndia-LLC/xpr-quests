@@ -8,14 +8,15 @@ const blockchain = new Blockchain();
 
 const questContract = blockchain.createContract("xprquests", "assembly/xprquests.contract", true);
 const xpContract = blockchain.createContract("xprquestxp", "../xprquestxp/assembly/xprquestxp.contract", true);
+const nftContract = blockchain.createAccount("atomicassets");
 
 const [admin, alice, bob] = blockchain.createAccounts("admin", "alice", "bob");
 
 /* ─────────────────────────────────────────────
  *  Helpers
  * ───────────────────────────────────────────── */
-async function setAdmin(): Promise<void> {
-  await questContract.actions.setadmin(["admin"]).send("xprquests@active");
+async function setupConfig(): Promise<void> {
+  await questContract.actions.setconfig(["admin", "xprquestxp", "atomicassets"]).send("xprquests@active");
 }
 
 async function createDefaultQuest(creator: string = "admin"): Promise<void> {
@@ -50,20 +51,22 @@ describe("XprQuests Contract", () => {
     blockchain.resetTables();
   });
 
-  // ─── setadmin ──────────────────────────────
-  describe("setadmin", () => {
-    it("should allow contract self to set admin", async () => {
-      await setAdmin();
+  // ─── setconfig ─────────────────────────────
+  describe("setconfig", () => {
+    it("should allow contract self to set config", async () => {
+      await setupConfig();
 
       const config = questContract.tables.config().getTableRows();
       expect(config.length).to.equal(1);
       expect(config[0].admin).to.equal("admin");
       expect(config[0].next_quest_id).to.equal(1);
+      expect(config[0].xp_contract).to.equal("xprquestxp");
+      expect(config[0].nft_contract).to.equal("atomicassets");
     });
 
     it("should reject non-self auth", async () => {
       await expectToThrow(
-        questContract.actions.setadmin(["admin"]).send("alice@active"),
+        questContract.actions.setconfig(["admin", "xprquestxp", "atomicassets"]).send("alice@active"),
         "Missing required authority",
       );
     });
@@ -141,6 +144,17 @@ describe("XprQuests Contract", () => {
         "xp_reward must be greater than 0",
       );
     });
+
+    it("should reject xp_reward exceeding 100000", async () => {
+      await expectToThrow(
+        questContract.actions
+          .createquest([
+            "admin", "Q", "desc", 1, "", "", "", 1, 100001, -1, "", "", 0, 0, false, 48, 0,
+          ])
+          .send("admin@active"),
+        "xp_reward cannot exceed 100000",
+      );
+    });
   });
 
   // ─── approvequest ──────────────────────────
@@ -188,6 +202,13 @@ describe("XprQuests Contract", () => {
       await expectToThrow(
         questContract.actions.setqstatus([1, 2]).send("alice@active"),
         "Missing required authority",
+      );
+    });
+
+    it("should reject invalid status value (> 3)", async () => {
+      await expectToThrow(
+        questContract.actions.setqstatus([1, 4]).send("admin@active"),
+        "invalid status (must be 0-3)",
       );
     });
   });

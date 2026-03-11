@@ -278,6 +278,7 @@ export default function AdminPage() {
                           onClick={() => approveQuest(quest.quest_id)}
                           className="p-2 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
                           title="Approve"
+                          aria-label="Approve quest"
                         >
                           <CheckCircle size={18} />
                         </button>
@@ -285,6 +286,7 @@ export default function AdminPage() {
                           onClick={() => rejectQuest(quest.quest_id)}
                           className="p-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
                           title="Reject"
+                          aria-label="Reject quest"
                         >
                           <XCircle size={18} />
                         </button>

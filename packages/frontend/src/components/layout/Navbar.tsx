@@ -62,6 +62,7 @@ export function Navbar() {
           className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
         >
           {mobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>

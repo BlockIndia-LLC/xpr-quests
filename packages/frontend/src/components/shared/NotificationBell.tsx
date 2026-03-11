@@ -36,6 +36,8 @@ export function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={handleOpen}
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-expanded={open}
         className="relative p-2 rounded-lg text-gray-400 hover:text-white hover:bg-surface transition-colors"
       >
         <Bell size={18} />
@@ -55,7 +57,9 @@ export function NotificationBell() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 rounded-xl bg-background-card border border-surface-border shadow-xl shadow-black/30 z-50 overflow-hidden"
+            role="region"
+            aria-label="Notifications"
+            className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm rounded-xl bg-background-card border border-surface-border shadow-xl shadow-black/30 z-50 overflow-hidden"
           >
             <div className="px-4 py-3 border-b border-surface-border">
               <h3 className="text-sm font-semibold text-white">

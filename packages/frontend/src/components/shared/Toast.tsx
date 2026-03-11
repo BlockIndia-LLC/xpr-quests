@@ -52,11 +52,13 @@ export default function Toast({
   return (
     <AnimatePresence>
       <motion.div
+        role="alert"
+        aria-live="assertive"
         initial={{ x: 100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: 100, opacity: 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        className={`fixed top-4 right-4 z-50 flex items-center gap-3 bg-background-card border-l-4 ${config.borderColor} rounded-lg px-4 py-3 shadow-xl shadow-black/30 max-w-sm`}
+        className={`fixed top-4 left-4 right-4 sm:left-auto sm:right-4 z-50 flex items-center gap-3 bg-background-card border-l-4 ${config.borderColor} rounded-lg px-4 py-3 shadow-xl shadow-black/30 sm:max-w-sm`}
       >
         <Icon className={`w-5 h-5 flex-shrink-0 ${config.iconColor}`} />
         <p className="text-sm text-white flex-grow">{message}</p>

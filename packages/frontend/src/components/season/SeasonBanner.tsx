@@ -81,7 +81,7 @@ export function SeasonBanner({ season, compact = false }: SeasonBannerProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 flex-shrink-0">
+        <div className="flex items-center gap-4 flex-shrink-0" aria-live="polite">
           {/* Countdown */}
           {timeLeft.ended ? (
             <span className="text-sm font-semibold text-red-400">

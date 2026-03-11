@@ -152,9 +152,10 @@ class XprQuestXP extends Contract {
   }
 
   private computeLevel(lifetime_xp: u64): u16 {
-    // level = floor(sqrt(lifetime_xp / 100))
+    // level = floor(sqrt(lifetime_xp / 100)), capped at u16 max
     if (lifetime_xp < 100) return 0;
-    return <u16>isqrt(lifetime_xp / 100);
+    const raw = isqrt(lifetime_xp / 100);
+    return raw > <u64>u16.MAX_VALUE ? u16.MAX_VALUE : <u16>raw;
   }
 
   // ── actions ────────────────────────────────
@@ -209,6 +210,10 @@ class XprQuestXP extends Contract {
 
     // Apply multiplier: boosted = amount * multiplier / 100
     const boosted: u64 = (<u64>amount * <u64>account!.xp_multiplier) / 100;
+
+    // Overflow guards
+    check(account!.lifetime_xp <= u64.MAX_VALUE - boosted, "lifetime_xp overflow");
+    check(account!.spendable_xp <= u64.MAX_VALUE - boosted, "spendable_xp overflow");
 
     account!.lifetime_xp += boosted;
     account!.spendable_xp += boosted;
@@ -275,6 +280,7 @@ class XprQuestXP extends Contract {
     requireAuth(cfg.admin);
     check(isAccount(user), "user account does not exist");
     check(multiplier > 0, "multiplier must be greater than 0");
+    check(multiplier <= 500, "multiplier cannot exceed 500 (5x)");
 
     let account = this.accountsTable.get(user.N);
     if (account == null) {

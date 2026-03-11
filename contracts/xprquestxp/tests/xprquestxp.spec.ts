@@ -234,6 +234,13 @@ describe("XprQuestXP Contract", () => {
         "multiplier must be greater than 0",
       );
     });
+
+    it("should reject multiplier exceeding 500 (5x)", async () => {
+      await expectToThrow(
+        xpContract.actions.setmultiplr(["alice", 501, true]).send("admin@active"),
+        "multiplier cannot exceed 500 (5x)",
+      );
+    });
   });
 
   // ─── soulbound: no transfer ────────────────

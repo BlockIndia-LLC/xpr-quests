@@ -83,6 +83,8 @@ class Config extends Table {
     public id: u64 = 0,
     public admin: Name = EMPTY_NAME,
     public next_quest_id: u64 = 1,
+    public xp_contract: Name = EMPTY_NAME,
+    public nft_contract: Name = EMPTY_NAME,
   ) {
     super();
   }
@@ -109,7 +111,7 @@ class XprQuests extends Contract {
   // ── helpers ────────────────────────────────
   private getConfig(): Config {
     let cfg = this.configTable.get(0);
-    check(cfg != null, "contract not configured – call setadmin first");
+    check(cfg != null, "contract not configured – call setconfig first");
     return cfg!;
   }
 
@@ -124,18 +126,22 @@ class XprQuests extends Contract {
   // ── actions ────────────────────────────────
 
   /**
-   * Set the admin account. Requires contract-level authority.
+   * Set contract configuration. Requires contract-level authority.
    */
-  @action("setadmin")
-  setAdmin(admin: Name): void {
+  @action("setconfig")
+  setConfig(admin: Name, xp_contract: Name, nft_contract: Name): void {
     requireAuth(this.receiver);
     check(isAccount(admin), "admin account does not exist");
+    check(isAccount(xp_contract), "xp_contract account does not exist");
+    check(isAccount(nft_contract), "nft_contract account does not exist");
 
     let cfg = this.configTable.get(0);
     if (cfg == null) {
-      cfg = new Config(0, admin, 1);
+      cfg = new Config(0, admin, 1, xp_contract, nft_contract);
     } else {
       cfg!.admin = admin;
+      cfg!.xp_contract = xp_contract;
+      cfg!.nft_contract = nft_contract;
     }
     this.configTable.set(cfg!, this.receiver);
   }
@@ -174,14 +180,16 @@ class XprQuests extends Contract {
       check(isAccount(target_contract), "target_contract account does not exist");
     }
 
-    // prerequisite quest must exist if specified
+    // prerequisite quest must exist and be active if specified
     if (prereq_quest_id > 0) {
       const prereq = this.questsTable.get(prereq_quest_id);
       check(prereq != null, "prerequisite quest does not exist");
+      check(prereq!.status == 1, "prerequisite quest is not active");
     }
 
     check(required_count > 0, "required_count must be greater than 0");
     check(xp_reward > 0, "xp_reward must be greater than 0");
+    check(xp_reward <= 100000, "xp_reward cannot exceed 100000");
     check(title.length > 0, "title cannot be empty");
 
     const questId = cfg.next_quest_id;
@@ -279,12 +287,14 @@ class XprQuests extends Contract {
     progress!.claimed = true;
     progressTable.set(progress!, this.receiver);
 
-    // Increment completed_count on the quest
+    // Increment completed_count on the quest (overflow guard)
+    check(quest!.completed_count < u32.MAX_VALUE, "completed_count overflow");
     quest!.completed_count += 1;
     this.questsTable.set(quest!, this.receiver);
 
-    // Send inline action to xprquestxp::addxp
-    const xpContract = Name.fromString("xprquestxp");
+    // Send inline action to xp_contract::addxp
+    const cfg = this.getConfig();
+    check(cfg.xp_contract != EMPTY_NAME, "xp_contract not configured");
     const addxpAction = Name.fromString("addxp");
 
     const actionData = new AddXPActionData(
@@ -295,7 +305,7 @@ class XprQuests extends Contract {
     );
 
     const action = new Action(
-      xpContract,
+      cfg.xp_contract,
       addxpAction,
       [new PermissionLevel(this.receiver, Name.fromString("active"))],
       actionData.pack(),
@@ -305,7 +315,7 @@ class XprQuests extends Contract {
 
     // Mint NFT badge if template is configured
     if (quest!.nft_template_id > 0 && quest!.nft_collection != EMPTY_NAME) {
-      const atomicAssets = Name.fromString("atomicassets");
+      check(cfg.nft_contract != EMPTY_NAME, "nft_contract not configured");
       const mintAction = Name.fromString("mintasset");
 
       const mintData = new MintAssetActionData(
@@ -317,7 +327,7 @@ class XprQuests extends Contract {
       );
 
       const mintAct = new Action(
-        atomicAssets,
+        cfg.nft_contract,
         mintAction,
         [new PermissionLevel(this.receiver, Name.fromString("active"))],
         mintData.pack(),
@@ -353,6 +363,8 @@ class XprQuests extends Contract {
   setQuestStatus(quest_id: u64, status: u8): void {
     const cfg = this.getConfig();
     requireAuth(cfg.admin);
+
+    check(status <= 3, "invalid status (must be 0-3)");
 
     const quest = this.questsTable.get(quest_id);
     check(quest != null, "quest does not exist");

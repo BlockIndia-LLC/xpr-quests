@@ -87,6 +87,7 @@ class SeasonConfig extends Table {
     public admin: Name = EMPTY_NAME,
     public xp_contract: Name = EMPTY_NAME,
     public next_season_id: u64 = 1,
+    public token_contract: Name = EMPTY_NAME,
   ) {
     super();
   }
@@ -135,17 +136,19 @@ class XprSeasons extends Contract {
    * Set admin and XP contract. Requires contract-level authority.
    */
   @action("setconfig")
-  setConfig(admin: Name, xp_contract: Name): void {
+  setConfig(admin: Name, xp_contract: Name, token_contract: Name): void {
     requireAuth(this.receiver);
     check(isAccount(admin), "admin account does not exist");
     check(isAccount(xp_contract), "xp_contract account does not exist");
+    check(isAccount(token_contract), "token_contract account does not exist");
 
     let cfg = this.configTable.get(0);
     if (cfg == null) {
-      cfg = new SeasonConfig(0, admin, xp_contract, 1);
+      cfg = new SeasonConfig(0, admin, xp_contract, 1, token_contract);
     } else {
       cfg!.admin = admin;
       cfg!.xp_contract = xp_contract;
+      cfg!.token_contract = token_contract;
     }
     this.configTable.set(cfg!, this.receiver);
   }
@@ -164,6 +167,7 @@ class XprSeasons extends Contract {
     requireAuth(cfg.admin);
 
     check(title.length > 0, "title cannot be empty");
+    check(start_time > currentTimeSec(), "start_time must be in the future");
     check(end_time > start_time, "end_time must be after start_time");
     check(reward_pool.length > 0, "reward_pool cannot be empty");
 
@@ -234,12 +238,17 @@ class XprSeasons extends Contract {
     const season = this.seasonsTable.get(season_id);
     check(season != null, "season does not exist");
     check(season!.status == 2, "season must be ended before snapshot");
+    check(users.length > 0, "users array cannot be empty");
     check(users.length == xps.length, "users and xps must have same length");
     check(users.length == ranks.length, "users and ranks must have same length");
 
     const leaderboard = this.getLeaderboardTable(season_id);
 
     for (let i = 0; i < users.length; i++) {
+      // Prevent duplicate snapshot entries
+      const existing = leaderboard.get(users[i].N);
+      check(existing == null, "duplicate user in snapshot");
+
       const entry = new LeaderboardEntry(users[i], xps[i], ranks[i]);
       leaderboard.set(entry, this.receiver);
     }
@@ -262,6 +271,7 @@ class XprSeasons extends Contract {
     const season = this.seasonsTable.get(season_id);
     check(season != null, "season does not exist");
     check(season!.status == 2, "season must be ended before distribution");
+    check(users.length > 0, "users array cannot be empty");
     check(users.length == amounts.length, "users and amounts must have same length");
 
     const rewardsTable = this.getRewardsTable(season_id);
@@ -294,8 +304,9 @@ class XprSeasons extends Contract {
     reward!.claimed = true;
     rewardsTable.set(reward!, this.receiver);
 
-    // Send inline eosio.token::transfer
-    const tokenContract = Name.fromString("eosio.token");
+    // Send inline token_contract::transfer
+    const cfg = this.getConfig();
+    check(cfg.token_contract != EMPTY_NAME, "token_contract not configured");
     const transferAction = Name.fromString("transfer");
 
     const transferData = new TransferActionData(
@@ -306,7 +317,7 @@ class XprSeasons extends Contract {
     );
 
     const action = new Action(
-      tokenContract,
+      cfg.token_contract,
       transferAction,
       [new PermissionLevel(this.receiver, Name.fromString("active"))],
       transferData.pack(),
