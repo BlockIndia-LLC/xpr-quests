@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @xpr-quests/shared build && pnpm --filter @xpr-quests/frontend build",
-  "outputDirectory": "packages/frontend/.next",
+  "outputDirectory": ".next",
   "installCommand": "pnpm install --ignore-scripts",
   "framework": "nextjs"
 }
