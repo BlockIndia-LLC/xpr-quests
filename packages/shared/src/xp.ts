@@ -1,5 +1,5 @@
-import { Tier, TIER_NAMES } from "./types";
-import { TIER_THRESHOLDS } from "./constants";
+import { Tier, TIER_NAMES } from "./types.js";
+import { TIER_THRESHOLDS } from "./constants.js";
 
 /**
  * Calculate level from lifetime XP.

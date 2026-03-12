@@ -1,4 +1,4 @@
-import { Tier } from "./types";
+import { Tier } from "./types.js";
 
 // ============================================================
 // Tier thresholds (minimum lifetime XP for each tier)
@@ -100,7 +100,7 @@ export const BADGE_SCHEMA = "questbadges" as const;
 // Season reward distribution tiers (10,000 XPR total)
 // ============================================================
 
-import type { SeasonRewardTier } from "./types";
+import type { SeasonRewardTier } from "./types.js";
 
 export const SEASON_REWARD_TIERS: SeasonRewardTier[] = [
   { rank_start: 1, rank_end: 10, xpr_per_user: "300.0000 XPR" },    // 3,000 XPR

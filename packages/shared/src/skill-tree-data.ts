@@ -1,4 +1,4 @@
-import type { SkillTree } from "./types";
+import type { SkillTree } from "./types.js";
 
 // ============================================================
 // Soulbound titles awarded on branch completion
