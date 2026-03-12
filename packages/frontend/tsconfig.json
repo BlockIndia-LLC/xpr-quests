@@ -14,7 +14,7 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@xpr-quests/shared": ["../shared/dist"]
+      "@xpr-quests/shared": ["../shared/src"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],

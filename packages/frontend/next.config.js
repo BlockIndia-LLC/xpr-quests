@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@xpr-quests/shared"],
   images: {
     remotePatterns: [
       {
@@ -7,6 +8,12 @@ const nextConfig = {
         hostname: "**",
       },
     ],
+  },
+  webpack: (config) => {
+    config.resolve.extensionAlias = {
+      ".js": [".ts", ".tsx", ".js"],
+    };
+    return config;
   },
 };
 
