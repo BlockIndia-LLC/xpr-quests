@@ -161,7 +161,7 @@ seasonRoutes.post("/seasons/:id/distribute", authMiddleware, adminGuard, async (
     if (rank <= 0) continue;
 
     const tier = SEASON_REWARD_TIERS.find(
-      (t) => rank >= t.rank_start && rank <= t.rank_end,
+      (t: { rank_start: number; rank_end: number; xpr_per_user: string }) => rank >= t.rank_start && rank <= t.rank_end,
     );
     if (!tier) continue;
 

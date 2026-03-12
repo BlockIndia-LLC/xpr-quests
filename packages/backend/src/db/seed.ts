@@ -250,7 +250,7 @@ async function seed() {
   for (const [questId, prereqId] of Object.entries(GENESIS_PREREQ_UPDATES)) {
     await db
       .update(quests)
-      .set({ prereq_quest_id: prereqId })
+      .set({ prereq_quest_id: prereqId as number })
       .where(eq(quests.quest_id, parseInt(questId)));
   }
 
